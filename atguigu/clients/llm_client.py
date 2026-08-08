@@ -9,3 +9,7 @@ llm = init_chat_model(
     temperature=0,
     base_url=settings.llm_base_url
 )
+
+if __name__ == '__main__':
+    result = llm.invoke('你好')
+    print(result)

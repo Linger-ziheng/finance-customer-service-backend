@@ -44,37 +44,37 @@ class ClarifyResponder:
         if reason is ClarifyReason.MULTIPLE_TRACKS:
             return (
                 "你这次同时提到了多个方向。我们先处理一个，"
-                "你想先办业务还是先咨询信息呢？"
+                "你想先办理业务还是先咨询金融信息呢？"
             )
 
         if reason is ClarifyReason.MISSING_FOCUSED_OBJECT:
-            return "请先发送你想咨询的对象，我再继续帮你看。"
+            return "请先发送你想咨询的对象（如客户、账户或产品），我再继续帮你看。"
 
         if reason is ClarifyReason.MISSING_KNOWLEDGE_INTENT:
             return (
-                "你是想了解商品信息、订单信息，"
-                "还是售后配送规则呢？"
+                "你是想了解理财产品信息、账户规则，"
+                "还是金融政策说明呢？"
             )
 
         if reason is ClarifyReason.MISSING_TRACK:
-            return "你是想先处理业务问题，还是先咨询信息呢？"
+            return "你是想先办理业务，还是先咨询金融信息呢？"
 
         if reason is ClarifyReason.MISSING_TASK_COMMANDS:
             return (
                 "你这次是想办理什么业务呢？"
-                "比如查订单、查物流，或者申请退款。"
+                "比如代客开户、更新联系方式、查询账户余额或了解理财产品。"
             )
 
         if reason is ClarifyReason.INVALID_TASK_COMMAND:
             return (
                 "当前任务状态不支持这个操作，"
-                "请告诉我你想开始、继续还是取消哪个任务。"
+                "请告诉我你想开始、继续还是取消哪个业务。"
             )
 
         if reason is ClarifyReason.UNKNOWN_KNOWLEDGE_INTENT:
             return (
                 "我暂时无法识别这个咨询方向，"
-                "你可以具体说说想了解的商品、订单或售后问题。"
+                "你可以具体说说想了解哪方面的金融信息。"
             )
 
         if reason is ClarifyReason.OBJECT_REQUIRES_INTENT:
@@ -84,19 +84,20 @@ class ClarifyResponder:
                     and focused_object.type == "order"
             ):
                 return (
-                    "我已经收到这个订单了。你想查订单状态、"
-                    "查物流，还是申请退款呢？"
+                    "我已经收到这个业务对象了。你想查询账户余额、"
+                    "更新联系方式，还是了解理财产品呢？"
                 )
             if (
                     focused_object is not None
                     and focused_object.type == "product"
             ):
                 return (
-                    "我已经收到这个商品了。你想了解它的商品信息、"
-                    "发货情况，还是售后相关问题呢？"
+                    "我已经收到这个产品了。你想了解产品信息、"
+                    "查询账户余额，还是办理其他业务呢？"
                 )
 
         return (
             "我还需要再确认一下你的意思，"
-            "你可以换个更具体的说法告诉我。"
+            "你可以换个更具体的说法告诉我，"
+            "比如要查询的客户编号、账号或想办理的业务。"
         )

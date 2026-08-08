@@ -24,7 +24,7 @@ from atguigu.task.response.renderer import ResponseRenderer
 
 
 def build_dialogue_engine() -> DialogueEngine:
-    flow_config_path = Path(__file__).parents[2] / 'flow_config' / 'user_flows.yml'
+    flow_config_path = Path(__file__).parents[2] / 'flow_config' / 'finance_flows.yml'
     flow_catalog = FlowLoader().load(flow_config_path)
 
     turn_planner = TurnPlanner()
