@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     # 商城 API
     commerce_api_base_url: str
 
+    # 金融 API
+    finance_api_base_url: str
+    finance_channel_code: str
+    finance_operator_no: str
+    finance_branch_code: str
+
     # 服务器
     app_host: str
     app_port: int

@@ -41,7 +41,7 @@ class FlowLoader:
         flows: dict[str, Flow] = {}
         for flow_id, flow_data in flows_data.items():
             flow_slots: list[FlowSlot] = [slots[step['slot_name']] for step in flow_data['steps'] if
-                                          step['type'] == 'collect']
+                                        step['type'] == 'collect']
 
             steps: list[FlowStep] = [FlowStep.from_dict(flow_step) for flow_step in flow_data['steps']]
 
@@ -59,6 +59,6 @@ class FlowLoader:
 
 if __name__ == '__main__':
     loader = FlowLoader()
-    path = Path(__file__).parents[3] / 'flow_config' / 'user_flows.yml'
+    path = Path(__file__).parents[3] / 'flow_config' / 'finance_flows.yml'
     flow_catalog = loader.load(path)
     print(flow_catalog)

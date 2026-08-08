@@ -1,0 +1,329 @@
+# finance_flows.yml
+# 金融客服工作流集合（依据 finance-data/tests/CUSTOMER_SERVICE_API_GUIDE.md 整理）
+#
+# 使用说明：
+# - 顶层结构必须包含 slots 与 flows 两个字段，由 FlowLoader 解析。
+# - action 步骤通过 action: <注册名> 引用 atguigu/task/action/custom 下
+#   的 Action 实现（ActionRegistry 注册名）。本文件引用的 action_finance_*
+#   动作已在 atguigu/task/action/custom/finance_*.py 中实现，启动时会通过
+#   register_custom_actions 自动注册。
+# - 代客操作鉴权约定（接口文档第 2 节）：Authorization: Bearer <员工编号>、
+#   X-Channel-Code 渠道编码、X-Request-Id 链路追踪、X-Operator-No 操作审计必填。
+#   当前从 .env 的 FINANCE_OPERATOR_NO/FINANCE_CHANNEL_CODE 读取。
+# - 所有代客操作都必须先核实客户身份（customer_no/证件号）并获得客户授权。
+
+slots:
+  customer_no:
+    type: text
+    label: 客户编号
+    description: 客户在系统中的唯一编号（customer_no），用于定位客户与身份核实
+
+  customer_name:
+    type: text
+    label: 客户姓名
+    description: 开户时录入的客户姓名，需与来电人核对
+
+  customer_id_type:
+    type: text
+    label: 证件类型
+    description: 开户时录入的证件类型（身份证/护照等）
+
+  customer_id_number:
+    type: text
+    label: 证件号码
+    description: 开户时录入的证件号码，需与来电人核对
+
+  phone_number:
+    type: text
+    label: 手机号
+    description: 客户预留联系电话
+
+  address:
+    type: text
+    label: 联系地址
+    description: 客户联系地址
+
+  contact_type:
+    type: text
+    label: 联系方式类型
+    description: 需要更新的联系方式类型（手机号/地址/邮箱）
+
+  contact_value:
+    type: text
+    label: 新的联系方式
+    description: 更新后的联系方式内容
+
+  contact_result:
+    type: text
+    label: 更新结果
+    description: 联系方式 UPSERT 的处理结果（新增/更新/去重命中）
+
+  account_no:
+    type: text
+    label: 账号
+    description: 客户账户/银行卡号
+
+  account_count:
+    type: number
+    label: 账户数量
+    description: 客户名下账户数量，用于判断是否需要让客户选择账户
+
+  account_list_summary:
+    type: text
+    label: 账户列表摘要
+    description: 客户名下账户列表的可展示摘要
+
+  balance:
+    type: text
+    label: 账户余额
+    description: 账户当前余额
+
+  frozen_amount:
+    type: text
+    label: 冻结金额
+    description: 账户当前冻结金额
+
+  account_product:
+    type: text
+    label: 账户产品
+    description: 账户对应的产品/账户类型
+
+  account_status:
+    type: text
+    label: 账户状态
+    description: 账户当前状态（正常/冻结/止付等）
+
+  freeze_reason:
+    type: text
+    label: 冻结原因
+    description: 冻结金额产生的原因说明
+
+  product_code:
+    type: text
+    label: 理财产品代码
+    description: 理财产品唯一代码（product_code），用户提供时可直接查询产品详情
+
+  products_summary:
+    type: text
+    label: 理财产品列表摘要
+    description: 理财产品列表的可展示摘要（名称/收益率/风险等级）
+
+  product_detail:
+    type: text
+    label: 理财产品详情
+    description: 单个理财产品的详情展示文本（开放期/结算规则/最新净值/风险等级）
+
+flows:
+  customer_onboarding:
+    name: 代客开户
+    description: "电话或在线代客开户。先与来电人核对身份资料并确认授权，再录入姓名、证件类型、证件号码、手机号、联系地址，调用 POST /api/v1/customers 创建客户并反馈客户编号。触发词：开户、开个户、办卡、电话开户、在线开户、我要开户。"
+    steps:
+      - id: start
+        type: start
+        next: verify_intro
+
+      - id: verify_intro
+        type: response
+        template:
+          text: "好的，我先为你办理开户。请先与来电人核对以下资料，并确认已获得客户本人授权：姓名、证件类型、证件号码、手机号、联系地址。核对无误后我们逐项录入。"
+        next: collect_name
+
+      - id: collect_name
+        type: collect
+        slot_name: customer_name
+        template:
+          text: "请告诉我客户的姓名。"
+        next: collect_id_type
+
+      - id: collect_id_type
+        type: collect
+        slot_name: customer_id_type
+        template:
+          text: "请提供客户的证件类型（如身份证、护照）。"
+        next: collect_id_number
+
+      - id: collect_id_number
+        type: collect
+        slot_name: customer_id_number
+        template:
+          text: "请提供客户的证件号码。"
+        next: collect_phone
+
+      - id: collect_phone
+        type: collect
+        slot_name: phone_number
+        template:
+          text: "请提供客户预留的手机号。"
+        next: collect_address
+
+      - id: collect_address
+        type: collect
+        slot_name: address
+        template:
+          text: "请提供客户的联系地址。"
+        next: create_customer
+
+      - id: create_customer
+        # POST /api/v1/customers —— 代客开户（电话/在线开户），需与来电人核对资料并录入
+        # 实现提示：读取 slots 中的 customer_name/customer_id_type/customer_id_number/
+        # phone_number/address，调用接口后回填 customer_no 与 customer_status。
+        type: action
+        action: action_finance_create_customer
+        next: show_result
+
+      - id: show_result
+        type: response
+        template:
+          text: "开户已提交。客户姓名：{{ slots.customer_name }}，证件号码：{{ slots.customer_id_number }}，客户编号：{{ slots.customer_no }}，状态：{{ slots.customer_status }}。请再次与来电人确认信息无误。"
+        next: end
+
+      - id: end
+        type: end
+        next: []
+
+  customer_contact_update:
+    name: 联系方式更新
+    description: "高频：代客更新手机号/地址等联系方式（UPSERT 去重）。核实客户编号并取得授权后，收集联系方式类型与新值，调用 POST /api/v1/customers/{customer_no}/contacts 完成新增或更新。触发词：更新手机号、修改地址、换手机号、改联系方式、联系号码变了。"
+    steps:
+      - id: start
+        type: start
+        next: collect_customer
+
+      - id: collect_customer
+        type: collect
+        slot_name: customer_no
+        template:
+          text: "请提供需要更新联系方式的客户编号。"
+        next: verify_identity
+
+      - id: verify_identity
+        type: response
+        template:
+          text: "收到，客户编号 {{ slots.customer_no }}。请先与来电人核对身份并取得授权后，再继续更新联系方式。"
+        next: collect_contact_type
+
+      - id: collect_contact_type
+        type: collect
+        slot_name: contact_type
+        template:
+          text: "需要更新哪种联系方式？（手机号 / 地址 / 邮箱）"
+        validation:
+          condition: "slots.get('contact_type') in ('mobile', 'phone', 'address', 'email', '手机', '手机号', '电话', '地址', '邮箱')"
+          failure_template:
+            text: "暂不支持该联系方式类型，请提供手机号、地址或邮箱。"
+        next: collect_contact_value
+
+      - id: collect_contact_value
+        type: collect
+        slot_name: contact_value
+        template:
+          text: "请提供更新后的联系方式内容。"
+        next: upsert_contact
+
+      - id: upsert_contact
+        # POST /api/v1/customers/{customer_no}/contacts —— 高频：代客更新手机号/地址等联系方式（含 UPSERT 去重）
+        # 实现提示：读取 slots 中的 customer_no/contact_type/contact_value，
+        # 调用接口后回填 contact_result（如“已新增/已更新/联系方式相同未变更”）。
+        type: action
+        action: action_finance_upsert_contact
+        next: show_result
+
+      - id: show_result
+        type: response
+        template:
+          text: "客户 {{ slots.customer_no }} 的{% if slots.contact_type in ('mobile', 'phone', '手机', '手机号', '电话') %}手机号{% elif slots.contact_type in ('address', '地址') %}联系地址{% elif slots.contact_type in ('email', '邮箱') %}邮箱{% else %}联系方式{% endif %}已更新为：{{ slots.contact_value }}。{{ slots.contact_result }}"
+        next: end
+
+      - id: end
+        type: end
+        next: []
+
+  account_balance_query:
+    name: 账户余额与冻结查询
+    description: "高频：查询客户账户余额、冻结金额、账户产品，答复“我卡里还有多少钱/为何冻结”。先按客户编号列出名下账户，账户唯一时直接查询，否则请客户选择账号，再调用 GET /api/v1/accounts/{account_no} 返回余额、冻结金额、账户产品与状态。触发词：余额、卡里多少钱、冻结、为什么冻结、账户产品、查账户。"
+    steps:
+      - id: start
+        type: start
+        next: collect_customer
+
+      - id: collect_customer
+        type: collect
+        slot_name: customer_no
+        template:
+          text: "请提供客户编号，我先核实身份并查询名下账户。"
+        next: list_accounts
+
+      - id: list_accounts
+        # GET /api/v1/customers/{customer_no}/accounts —— 高频：列出客户名下全部账户（默认账户列表入口）
+        # 实现约定：仅一个账户时直接回填 account_no 与 account_count=1；
+        # 多个账户时回填 account_count>1 与 account_list_summary。
+        type: action
+        action: action_finance_list_customer_accounts
+        next:
+          - if: "slots.get('account_count') == 1"
+            then: query_account
+          - else: ask_account_no
+
+      - id: ask_account_no
+        type: collect
+        slot_name: account_no
+        template:
+          text: "客户名下有以下账户：{{ slots.account_list_summary }}。请提供要查询的账号。"
+        next: query_account
+
+      - id: query_account
+        # GET /api/v1/accounts/{account_no} —— 高频：查余额、冻结金额、账户产品；
+        # 冻结原因可从账户返回的冻结/状态信息中提取（如需追溯变更轨迹可另接
+        # GET /api/v1/customers/{customer_no}/status-history 或 ledgers）。
+        type: action
+        action: action_finance_query_account
+        next: show_result
+
+      - id: show_result
+        type: response
+        template:
+          text: "账户 {{ slots.account_no }}（{{ slots.account_product }}）当前余额：{{ slots.balance }} 元，冻结金额：{{ slots.frozen_amount }} 元，账户状态：{{ slots.account_status }}。{% if slots.get('frozen_amount') and slots.get('frozen_amount') != '0' %}冻结原因：{{ slots.freeze_reason }}。{% endif %}"
+        next: end
+
+      - id: end
+        type: end
+        next: []
+
+  wealth_product_query:
+    name: 理财产品咨询
+    description: "高频：答复“有什么理财产品/收益率/风险等级”。用户已提供具体产品代码时调用 GET /api/v1/wealth/products/{product_code} 查询详情；否则调用 GET /api/v1/wealth/products 返回在售产品列表摘要（名称、收益率、风险等级）。触发词：理财产品、收益率、风险等级、推荐理财、有什么理财。"
+    steps:
+      - id: start
+        type: start
+        next:
+          - if: "slots.get('product_code')"
+            then: query_product_detail
+          - else: list_products
+
+      - id: list_products
+        # GET /api/v1/wealth/products —— 高频：在售理财产品列表（名称/收益率/风险等级）
+        type: action
+        action: action_finance_list_wealth_products
+        next: show_list
+
+      - id: show_list
+        type: response
+        template:
+          text: "当前在售理财产品如下：{{ slots.products_summary }}。如需了解某只产品的开放期、净值或公告，请告诉我产品代码。"
+        next: end
+
+      - id: query_product_detail
+        # GET /api/v1/wealth/products/{product_code} —— 产品详情（开放期/结算规则/最新净值/公告）
+        type: action
+        action: action_finance_query_wealth_product
+        next: show_detail
+
+      - id: show_detail
+        type: response
+        template:
+          text: "产品 {{ slots.product_code }} 详情：{{ slots.product_detail }}。"
+        next: end
+
+      - id: end
+        type: end
+        next: []
